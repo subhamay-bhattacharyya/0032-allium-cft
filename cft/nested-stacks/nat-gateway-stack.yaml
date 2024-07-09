@@ -1,0 +1,181 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Project Allium: CFN Template to create a custom Network Acl with inbound and outbound rules.
+
+Metadata:
+  TemplateName: nat-gateway-stack.yaml
+  TemplateType: Network Acl
+  Version: 1.0.0
+  Owner: Subhamay Bhattacharyya
+  ProjectName: Allium
+  Last Modified: Jul 02, 2024
+  Resources: 
+    - Nat Gateway 
+    - Elastic IP associated with the Nat Gateway
+  StepsToTest: |
+    Manualy verify the Stack.
+  StepsToCleanup: |
+    Stack delete command
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    #################################### Project Name and Environment ##############################
+    - Label:
+        default: "Project Name and Environment:"
+      Parameters:
+      - ProjectName
+      - Environment
+    #################################### GitHub Attributes #########################################
+    - Label:
+        default: "GitHub Attributes:"
+      Parameters:
+      - GitHubRef
+      - GitHubURL
+      - GitHubWFRunNumber
+      - GitHubSHA
+      - GitHubRepository
+      - CiBuild
+    #################################### Security Group ############################################
+    - Label:
+        default: "VPC Id"
+      Parameters: 
+      - ElasticIPName
+      - NatGWName
+      - PublicSubnetId
+    ParameterLabels:
+      ################################## Project Name and Environment ##############################
+      ProjectName:
+        default: "Project name."
+      Environment:
+        default: "Environment name."
+      ################################## GitHub Attributes #########################################
+      GitHubRef:
+        default: "GitHub ref."
+      GitHubURL:
+        default: "GitHub URL."
+      GitHubWFRunNumber:
+        default: "GitHub workflow run number."
+      GitHubSHA:
+        default: "GitHub SHA."
+      GitHubRepository:
+        default: "GitHub repository."
+      CiBuild:
+        default: "Ci build."
+      ##################################Security Group #############################################
+      ElasticIPName:
+        default: "VPC Id where the security group needs to be created."
+      NatGWName: 
+        default: "Name of the Nat Gateway."
+      PublicSubnetId: 
+        default: "The Id of the public subnet where the Nwt Gateway will be attached."
+Parameters:
+  ###################################### Project Name and Environment ##############################
+  ProjectName:
+    Default: allium
+    Description: "The project name that will be used as resource name prefixes and will be used to tag resources to track the project cost."
+    Type: String
+    MinLength: 5
+    MaxLength: 20
+    AllowedPattern: "[a-z]*"
+    ConstraintDescription: "The length should be between 5 and 30, must contain only lowercase alphabets."
+  Environment:
+    Default: devl
+    Description: "The deployment environment (dev/test/prod)."
+    Type: String
+    AllowedValues: ["devl", "test", "prod"]
+    ConstraintDescription: "The Environment must be devl / test or prod"
+  ###################################### GitHub Attributes #########################################
+  GitHubRef:
+    Default: ref_name
+    Description: "GitHub ref name"
+    Type: String
+  GitHubURL:
+    Default: "https://github.com/"
+    Description: "GitHub URL"
+    Type: String
+  GitHubWFRunNumber:
+    Default: 1
+    Description: "The GitHub workflow run number for the latest CI/CD pipeline."
+    Type: Number
+  GitHubSHA:
+    Default: "27e994ee4b064c37170c9a702c44b676c3295e1f"
+    Description: "The sha value of the last commit."
+    Type: String
+  GitHubRepository:
+    Default: 0032-allium-cft
+    Description: "The GitHub repository name."
+    Type: String
+    MinLength: 10
+    MaxLength: 30
+    AllowedPattern: "[a-z0-9-.]*"
+    ConstraintDescription: "The reposiroty length should be between 10 and 30, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+  CiBuild:
+    Default: ""
+    Description: "Ci Build of the feature branch."
+    Type: String
+  ###################################### Security Group ############################################
+  ElasticIPName: 
+    Description: The name of the Elastic IP.
+    Type: String
+  NatGWName: 
+    Description: The name of the Nat Gateway.
+    Type: String
+  PublicSubnetId: 
+    Description: Public Subnet Id
+    Type: String
+Resources:
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+      - Key: Name
+        Value: !Sub '${ProjectName}-${ElasticIPName}-${Environment}-${AWS::Region}${CiBuild}'
+      - Key: ProjectName
+        Value: !Ref ProjectName
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: GitHubRepository
+        Value: !Ref GitHubRepository
+      - Key: GitHubRef
+        Value: !Ref GitHubRef
+      - Key: GitHubURL
+        Value: !Ref GitHubURL
+      - Key: GitHubWFRunNumber
+        Value: !Ref GitHubWFRunNumber
+      - Key: GitHubSHA
+        Value: !Ref GitHubSHA
+      - Key: CiBuild 
+        Value: !Ref CiBuild
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt ElasticIP.AllocationId
+      SubnetId: !Ref PublicSubnetId
+      Tags: 
+      - Key: Name
+        Value: !Sub '${ProjectName}-${NatGWName}-${Environment}-${AWS::Region}${CiBuild}'
+      - Key: ProjectName
+        Value: !Ref ProjectName
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: GitHubRepository
+        Value: !Ref GitHubRepository
+      - Key: GitHubRef
+        Value: !Ref GitHubRef
+      - Key: GitHubURL
+        Value: !Ref GitHubURL
+      - Key: GitHubWFRunNumber
+        Value: !Ref GitHubWFRunNumber
+      - Key: GitHubSHA
+        Value: !Ref GitHubSHA
+Outputs:
+  NatGatewayId: 
+    Description: NAT Gateway Id
+    Value: !GetAtt NatGateway.NatGatewayId
+  EIPAllocationId:
+    Description: Elastic IP Allocation Id
+    Value: !GetAtt ElasticIP.AllocationId
+  ElasticIP:
+    Description: Elastic IP
+    Value: !GetAtt ElasticIP.PublicIp

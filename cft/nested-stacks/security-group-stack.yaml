@@ -1,0 +1,251 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Project Allium: CFN Template to create a EC2 security group with rules
+
+Metadata:
+  TemplateName: security-group-stack.yaml
+  TemplateType: Security Group to allow ICMP.
+  Version: 1.0.0
+  Owner: Subhamay Bhattacharyya
+  ProjectName: Allium
+  Last Modified: Jul 02, 2024
+  Resources: 
+    - One EC2 security group to allow ICMP traffic
+  StepsToTest: |
+    Manualy verify the Stack.
+  StepsToCleanup: |
+    Stack delete command
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    #################################### Project Name and Environment ##############################
+    - Label:
+        default: "Project Name and Environment:"
+      Parameters:
+      - ProjectName
+      - Environment
+    #################################### GitHub Attributes #########################################
+    - Label:
+        default: "GitHub Attributes:"
+      Parameters:
+      - GitHubRef
+      - GitHubURL
+      - GitHubWFRunNumber
+      - GitHubSHA
+      - GitHubRepository
+      - CiBuild
+    #################################### Security Group ############################################
+    - Label:
+        default: "Security Group Parameters"
+      Parameters: 
+      - VpcId
+      - EnableIPV6Cidr
+      - SecurityGroupBaseName
+      - SecurityGroupDescription
+      - IPProtocol
+      - FromPort
+      - ToPort
+      - CidrIp
+      - CidrIpv6
+      - SourceSecurityGroupId
+  RuleDescription:
+    ParameterLabels:
+      ################################## Project Name and Environment ##############################
+      ProjectName:
+        default: "Project name."
+      Environment:
+        default: "Environment name."
+      ################################## GitHub Attributes #########################################
+      GitHubRef:
+        default: "GitHub ref."
+      GitHubURL:
+        default: "GitHub URL."
+      GitHubWFRunNumber:
+        default: "GitHub workflow run number."
+      GitHubSHA:
+        default: "GitHub SHA."
+      GitHubRepository:
+        default: "GitHub repository."
+      CiBuild:
+        default: "Ci build."
+      ################################## Security Group ############################################
+      VpcId:
+        default: "VPC Id where the EC2 security group will to be created."
+      EnableIPV6Cidr: 
+        default: "Enable IPV6 Cidr."
+      SecurityGroupBaseName:
+        default: "EC2 security group name."
+      SecurityGroupDescription:
+        default: "EC2 security group description."
+      IPProtocol:
+        default: "IPV4 protocol."
+      FromPort:
+        default: "Open port (from)."
+      ToPort:
+        default: "Open port (to)."
+      CidrIp:
+        default: "CIDR IPV4."
+      CidrIpv6:
+        default: "CIDR IPV6."
+      SourceSecurityGroupId:
+        default: "Source security group id."
+Parameters:
+  ###################################### Project Name and Environment ##############################
+  ProjectName:
+    Default: allium
+    Description: "The project name that will be used as resource name prefixes and will be used to tag resources to track the project cost."
+    Type: String
+    MinLength: 5
+    MaxLength: 20
+    AllowedPattern: "[a-z]*"
+    ConstraintDescription: "The length should be between 5 and 30, must contain only lowercase alphabets."
+  Environment:
+    Default: devl
+    Description: "The deployment environment (dev/test/prod)."
+    Type: String
+    AllowedValues: ["devl", "test", "prod"]
+    ConstraintDescription: "The Environment must be devl / test or prod"
+  ###################################### GitHub Attributes #########################################
+  GitHubRef:
+    Default: ref_name
+    Description: "GitHub ref name"
+    Type: String
+  GitHubURL:
+    Default: "https://github.com/"
+    Description: "GitHub URL"
+    Type: String
+  GitHubWFRunNumber:
+    Default: 1
+    Description: "The GitHub workflow run number for the latest CI/CD pipeline."
+    Type: Number
+  GitHubSHA:
+    Default: "27e994ee4b064c37170c9a702c44b676c3295e1f"
+    Description: "The sha value of the last commit."
+    Type: String
+  GitHubRepository:
+    Default: 0032-allium-cft
+    Description: "The GitHub repository name."
+    Type: String
+    MinLength: 10
+    MaxLength: 30
+    AllowedPattern: "[a-z0-9-.]*"
+    ConstraintDescription: "The reposiroty length should be between 10 and 30, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+  CiBuild:
+    Default: ""
+    Description: "Ci Build of the feature branch."
+    Type: String
+  ###################################### Security Group ############################################
+  VpcId: 
+    Description: The VPC Id where the Lambda security group will be created.
+    Type: AWS::EC2::VPC::Id
+  EnableIPV6Cidr:
+    Default: "false"
+    Description: "Enable IPV6 Cidr ?"
+    Type: String
+    AllowedValues:
+    - "true"
+    - "false"
+  SecurityGroupBaseName:
+    Default: ec2-sg
+    Description: "EC2 security group base name."
+    Type: String
+    MinLength: 3
+    MaxLength: 120
+    AllowedPattern: "[a-zA-Z0-9-]*"
+  SecurityGroupDescription:
+    Default: "EC2 Security Group"
+    Description: "EC2 security group description."
+    Type: String
+    MinLength: 10
+    MaxLength: 50
+    AllowedPattern: "[a-zA-Z0-9 .-]*"
+  IPProtocol: 
+    Default: "icmp"
+    Type: String
+    AllowedValues:
+    - "icmp"
+    - "tcp"
+  FromPort:
+    Default: -1
+    Type: Number
+  ToPort:
+    Default: -1
+    Type: Number
+  CidrIp: 
+    Default: "0.0.0.0/0"
+    Type: String
+  CidrIpv6: 
+    Default: "::/0"
+    Type: String
+  SourceSecurityGroupId: 
+    Type: String
+  RuleDescription:
+    Default: "Open up ports for ICMP"
+    Type: String
+######################################## Conditions ################################################
+Conditions:
+  EnableIPV6Cidr: !Equals [!Ref EnableIPV6Cidr, "true"]
+  SourceSecurityGroup: !Not 
+    - !Equals 
+      - !Ref SourceSecurityGroupId 
+      - ""
+
+  NotSourceSecurityGroup:  !Equals 
+      - !Ref SourceSecurityGroupId 
+      - ""
+Resources:
+  ###################################### EC2 Security Group ########################################
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${ProjectName}-${SecurityGroupBaseName}-${AWS::Region}${CiBuild}'
+      GroupDescription: !Ref SecurityGroupDescription
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${SecurityGroupBaseName}-${Environment}-${AWS::Region}${CiBuild}'
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: GitHubRepository
+          Value: !Ref GitHubRepository
+        - Key: GitHubRef
+          Value: !Ref GitHubRef
+        - Key: GitHubURL
+          Value: !Ref GitHubURL
+        - Key: GitHubWFRunNumber
+          Value: !Ref GitHubWFRunNumber
+        - Key: GitHubSHA
+          Value: !Ref GitHubSHA
+  ###################################### EC2 Security Group Rules ##################################
+  SecGroupRuleIPV4:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt SecurityGroup.GroupId
+      IpProtocol: !Ref IPProtocol
+      FromPort: !Ref FromPort
+      ToPort: !Ref ToPort
+      CidrIp:  !If [ NotSourceSecurityGroup, !Ref CidrIp, !Ref 'AWS::NoValue' ]
+      SourceSecurityGroupId: !If [ SourceSecurityGroup, !Ref SourceSecurityGroupId, !Ref 'AWS::NoValue' ]
+      Description: !Ref RuleDescription
+  SecGroupRuleIPV6:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: EnableIPV6Cidr
+    Properties:
+      GroupId: !GetAtt SecurityGroup.GroupId
+      IpProtocol: !Ref IPProtocol
+      FromPort: !Ref FromPort
+      ToPort: !Ref ToPort
+      CidrIpv6: !If [ NotSourceSecurityGroup, !Ref CidrIpv6, !Ref 'AWS::NoValue' ]
+      SourceSecurityGroupId:  !If [ SourceSecurityGroup, !Ref SourceSecurityGroupId, !Ref 'AWS::NoValue' ]
+      Description: !Ref RuleDescription
+Outputs:
+  SecurityGroupId:
+    Description: EC2 Security Group Id
+    Value: !GetAtt SecurityGroup.GroupId
+  SecurityGroupVpcId:
+    Description: VPC Id of EC2 Security Group
+    Value: !GetAtt SecurityGroup.VpcId
+
+

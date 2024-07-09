@@ -1,0 +1,247 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Project Allium: CFN Template to create a EC2 IAM Role and instance profile 
+
+Metadata:
+  TemplateName: iam-role-stack.yaml
+  TemplateType: IAM Role / IAM Policy / EC2 Instance Profile
+  Version: 1.0.0
+  Owner: Subhamay Bhattacharyya
+  ProjectName: Allium
+  Modification History:
+    - 1.0.0  - Jul 02, 2024   -- Initial Version 
+  Resources: 
+    - IAM Role
+    - IAM Policy Attached To The Role
+  StepsToTest: |
+    Manualy verify the Stack.
+  StepsToCleanup: |
+    Stack delete command
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    #################################### Project Name and Environment ##############################
+    - Label:
+        default: "Project Name and Environment:"
+      Parameters:
+      - ProjectName
+      - Environment
+    #################################### GitHub Attributes #########################################
+    - Label:
+        default: "GitHub Attributes:"
+      Parameters:
+      - GitHubRef
+      - GitHubURL
+      - GitHubWFRunNumber
+      - GitHubSHA
+      - GitHubRepository
+      - CiBuild
+    #################################### KMS Key ###################################################
+    - Label: 
+        default: 'KMS Configuration:'
+      Parameters: 
+      - KmsMasterKeyArn
+    #################################### EC2 Instance Profile ######################################
+    - Label:
+        default: "EC2 instance security:"
+      Parameters: 
+      - EC2InstanceRoleBaseName
+      - EC2InstancePolicyBaseName
+    ParameterLabels:
+      ################################## Project Name and Environment ##############################
+      ProjectName:
+        default: "Project name."
+      Environment:
+        default: "Environment name."
+      ################################## GitHub Attributes #########################################
+      GitHubRef:
+        default: "GitHub ref."
+      GitHubURL:
+        default: "GitHub URL."
+      GitHubWFRunNumber:
+        default: "GitHub workflow run number."
+      GitHubSHA:
+        default: "GitHub SHA."
+      GitHubRepository:
+        default: "GitHub repository."
+      CiBuild:
+        default: "Ci build."
+      ################################## EC2 Instance Profile ######################################
+      EC2InstanceRoleBaseName:
+        default: "EC2 instance role base name."
+      EC2InstancePolicyBaseName:
+        default: "EC2 instance policy base name."
+Parameters:
+  ###################################### Project Name and Environment ##############################
+  ProjectName:
+    Default: allium
+    Description: "The project name that will be used as resource name prefixes and will be used to tag resources to track the project cost."
+    Type: String
+    MinLength: 5
+    MaxLength: 20
+    AllowedPattern: "[a-z]*"
+    ConstraintDescription: "The length should be between 5 and 30, must contain only lowercase alphabets."
+  Environment:
+    Default: devl
+    Description: "The deployment environment (dev/test/prod)."
+    Type: String
+    AllowedValues: ["devl", "test", "prod"]
+    ConstraintDescription: "The Environment must be devl / test or prod"
+  ###################################### GitHub Attributes #########################################
+  GitHubRef:
+    Default: ref_name
+    Description: "GitHub ref name"
+    Type: String
+  GitHubURL:
+    Default: "https://github.com/"
+    Description: "GitHub URL"
+    Type: String
+  GitHubWFRunNumber:
+    Default: 1
+    Description: "The GitHub workflow run number for the latest CI/CD pipeline."
+    Type: Number
+  GitHubSHA:
+    Default: "27e994ee4b064c37170c9a702c44b676c3295e1f"
+    Description: "The sha value of the last commit."
+    Type: String
+  GitHubRepository:
+    Default: 0032-allium-cft
+    Description: "The GitHub repository name."
+    Type: String
+    MinLength: 10
+    MaxLength: 30
+    AllowedPattern: "[a-z0-9-.]*"
+    ConstraintDescription: "The reposiroty length should be between 10 and 30, must contain only lowercase letter,numbers,dash, dot and should start with a letter."
+  CiBuild:
+    Default: ""
+    Description: "Ci Build of the feature branch."
+    Type: String
+  ###################################### KMS #######################################################
+  KmsMasterKeyArn:
+    Default: "arn:aws:kms:us-east-1:237376087602:key/f7eb118d-f1d2-4d70-a046-dfada470840e"
+    Description: "The KMS key arn used for encryption."
+    Type: String
+    MinLength: 75
+    MaxLength: 75
+    AllowedPattern: "[a-z:/0-9-]*"
+    ConstraintDescription: "The length of the KMS Key Id should be 36 and must be lowercase alphabets, numbers and dash."  
+  ###################################### EC2 Instance Profile ######################################
+  EC2InstanceRoleBaseName:
+    Default: ec2-role
+    Description: EC2 Instance execution role name
+    Type: String
+    MinLength: 5
+    MaxLength: 15
+    AllowedPattern: '[a-zA-Z0-9-]*'
+    ConstraintDescription: The length should be between 5 and 10, must contain only alphanumeric or dash.
+  EC2InstancePolicyBaseName:
+    Default: ec2-policy
+    Description: EC2 Instance policy name
+    Type: String
+    MinLength: 5
+    MaxLength: 15
+    AllowedPattern: '[a-zA-Z0-9-]*'
+    ConstraintDescription: The length should be between 5 and 15, must contain only alphanumeric or dash.
+Resources:
+  ###################################### EC2 Instance Role #########################################
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-${EC2InstanceRoleBaseName}-${Environment}${CiBuild}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: !Sub '${ProjectName}-${EC2InstancePolicyBaseName}-${Environment}${CiBuild}'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Sid: AllowSSMAPI
+              Effect: Allow
+              Action: 
+              - 'ssm:DescribeAssociation'
+              - 'ssm:GetDeployablePatchSnapshotForInstance'
+              - 'ssm:GetDocument'
+              - 'ssm:DescribeDocument'
+              - 'ssm:GetManifest'
+              - 'ssm:GetParameter'
+              - 'ssm:GetParameters'
+              - 'ssm:ListAssociations'
+              - 'ssm:ListInstanceAssociations'
+              - 'ssm:PutInventory'
+              - 'ssm:PutComplianceItems'
+              - 'ssm:PutConfigurePackageResult'
+              - 'ssm:UpdateAssociationStatus'
+              - 'ssm:UpdateInstanceAssociationStatus'
+              - 'ssm:UpdateInstanceInformation'
+              Resource: "*"
+            - Sid: AllowDSSMMessagesAPI
+              Effect: Allow
+              Action: 
+              - 'ssmmessages:CreateControlChannel'
+              - 'ssmmessages:CreateDataChannel'
+              - 'ssmmessages:OpenControlChannel'
+              - 'ssmmessages:OpenDataChannel'
+              Resource: "*"
+            - Sid: AllowEC2MessagesAPI
+              Effect: Allow
+              Action: 
+              - 'ec2messages:AcknowledgeMessage'
+              - 'ec2messages:DeleteMessage'
+              - 'ec2messages:FailMessage'
+              - 'ec2messages:GetEndpoint'
+              - 'ec2messages:GetMessages'
+              - 'ec2messages:SendReply'
+              Resource: "*"
+            - Sid: AllowS3API
+              Effect: Allow
+              Action: 
+              - s3:ListBucket
+              - s3:PutObject
+              - s3:GetObject
+              Resource: "*"
+            - Sid: AllowKMSDecryption
+              Effect: Allow
+              Action: 
+              - kms:Decrypt
+              - kms:Encrypt
+              - kms:GenerateDataKey
+              - kms:GenerateDataKeyPair
+              Resource:
+              - !Ref KmsMasterKeyArn
+      Tags: 
+      - Key: ProjectName
+        Value: !Ref ProjectName
+      - Key: EnvironmentName
+        Value: !Ref Environment
+      - Key: GitHubRepository
+        Value: !Ref GitHubRepository
+      - Key: GitHubRef
+        Value: !Ref GitHubRef
+      - Key: GitHubURL
+        Value: !Ref GitHubURL
+      - Key: GitHubWFRunNumber
+        Value: !Ref GitHubWFRunNumber
+      - Key: GitHubSHA
+        Value: !Ref GitHubSHA  
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub '${ProjectName}-instance-profile-${Environment}${CiBuild}'
+      Path: /
+      Roles:
+        - !Ref EC2InstanceRole      
+Outputs:
+  EC2InstnaceRoleArn:
+    Description: The Arn of the EC2 Instance Role
+    Value: !GetAtt EC2InstanceRole.Arn
+  EC2InstnaceProfile:
+    Description: EC2 Instance Profile
+    Value: !Ref EC2InstanceProfile
